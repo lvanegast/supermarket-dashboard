@@ -15,13 +15,20 @@ try:
 except ImportError:
     SKLEARN_AVAILABLE = False
 
+try:
+    from load_data import load_csv_to_sqlite
+    LOAD_DATA_AVAILABLE = True
+except Exception:
+    load_csv_to_sqlite = None
+    LOAD_DATA_AVAILABLE = False
+
 # ==============================================
-# CONFIGURACION PAGINA
+# PAGE CONFIG
 # ==============================================
 st.set_page_config(page_title="SuperMarket Analytics", page_icon="🛒", layout="wide")
 
 # ==============================================
-# PALETA Y CONSTANTES DE DISEÑO
+# COLOR PALETTE AND DESIGN CONSTANTS
 # ==============================================
 COLORS = {
     "primary": "#6366f1",
@@ -43,7 +50,7 @@ PALETTE = [
     "#06b6d4", "#8b5cf6", "#f97316",
 ]
 
-# Plotly layout base reutilizable
+# Reusable Plotly base layout
 PLOTLY_LAYOUT = dict(
     template="plotly_dark",
     paper_bgcolor="rgba(0,0,0,0)",
@@ -60,7 +67,7 @@ PLOTLY_LAYOUT = dict(
 )
 
 # ==============================================
-# CSS MODERNO
+# MODERN CSS
 # ==============================================
 st.markdown(f"""
 <style>
@@ -633,30 +640,61 @@ div[data-testid="stAlert"] {{
 """, unsafe_allow_html=True)
 
 # ==============================================
-# CARGA DE DATOS
+# DATA LOADING
 # ==============================================
 DB_PATH = Path(__file__).resolve().parent.parent / "database" / "sales.db"
 
 
 @st.cache_data
-def load_data():
+def fetch_data():
     if not DB_PATH.exists():
         return None
     conn = sqlite3.connect(str(DB_PATH))
-    df = pd.read_sql_query("SELECT * FROM sales", conn)
-    conn.close()
+    try:
+        df = pd.read_sql_query("SELECT * FROM sales", conn)
+    except Exception:
+        return None
+    finally:
+        conn.close()
     df["Date"] = pd.to_datetime(df["Date"])
     return df
 
 
-df = load_data()
+def ensure_db():
+    if DB_PATH.exists():
+        return True
+    if not LOAD_DATA_AVAILABLE:
+        return False
+    try:
+        load_csv_to_sqlite()
+    except Exception as exc:
+        st.error(f"Error al cargar datos iniciales: {exc}")
+        return False
+    return DB_PATH.exists()
 
-if df is None or df.empty:
-    st.error("No se encontro la base de datos. Ejecuta primero: `python src/load_data.py`")
+
+if not ensure_db():
+    st.error("Database not found and auto-load failed. Run: `python src/load_data.py`")
     st.stop()
 
+df = fetch_data()
+
+if df is None or df.empty:
+    if LOAD_DATA_AVAILABLE:
+        st.warning("Database is empty or incomplete. Trying to load data...")
+        try:
+            load_csv_to_sqlite()
+            st.cache_data.clear()
+            df = fetch_data()
+        except Exception as exc:
+            st.error(f"Could not load data automatically: {exc}")
+            st.stop()
+    if df is None or df.empty:
+        st.error("No data found. Run first: `python src/load_data.py`")
+        st.stop()
+
 # ==============================================
-# SIDEBAR - FILTROS
+# SIDEBAR - FILTERS
 # ==============================================
 st.sidebar.markdown(
     '''
@@ -670,14 +708,14 @@ st.sidebar.markdown(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.markdown('<div class="sidebar-section-header">🎯 Filtros de Datos</div>',
+st.sidebar.markdown('<div class="sidebar-section-header">🎯 Data Filters</div>',
                     unsafe_allow_html=True)
 
-# Rango de fechas
+# Date range
 min_date = df["Date"].min().date()
 max_date = df["Date"].max().date()
 date_range = st.sidebar.date_input(
-    "Rango de fechas",
+    "Date range",
     value=(min_date, max_date),
     min_value=min_date,
     max_value=max_date,
@@ -685,21 +723,21 @@ date_range = st.sidebar.date_input(
 
 # Multiselects
 cities = sorted(df["City"].unique().tolist())
-city_sel = st.sidebar.multiselect("Ciudad", cities, default=cities)
+city_sel = st.sidebar.multiselect("City", cities, default=cities)
 
 products = sorted(df["Product line"].unique().tolist())
-product_sel = st.sidebar.multiselect("Linea de Producto", products, default=products)
+product_sel = st.sidebar.multiselect("Product line", products, default=products)
 
 genders = sorted(df["Gender"].unique().tolist())
-gender_sel = st.sidebar.multiselect("Genero", genders, default=genders)
+gender_sel = st.sidebar.multiselect("Gender", genders, default=genders)
 
 payments = sorted(df["Payment"].unique().tolist())
-payment_sel = st.sidebar.multiselect("Metodo de Pago", payments, default=payments)
+payment_sel = st.sidebar.multiselect("Payment method", payments, default=payments)
 
 customer_types = sorted(df["Customer type"].unique().tolist())
-ctype_sel = st.sidebar.multiselect("Tipo de Cliente", customer_types, default=customer_types)
+ctype_sel = st.sidebar.multiselect("Customer type", customer_types, default=customer_types)
 
-# Aplicar filtros
+# Apply filters
 df_filtered = df.copy()
 
 if isinstance(date_range, tuple) and len(date_range) == 2:
@@ -716,7 +754,7 @@ df_filtered = df_filtered[df_filtered["Payment"].isin(payment_sel)]
 df_filtered = df_filtered[df_filtered["Customer type"].isin(ctype_sel)]
 
 # ==============================================
-# TITULO
+# TITLE
 # ==============================================
 total_records = len(df_filtered)
 date_range_str = (f"{df_filtered['Date'].min().strftime('%b %d')} - "
@@ -727,18 +765,18 @@ st.markdown(
     f'''
     <div class="hero-header">
         <div class="hero-title">🛒 SuperMarket Dashboard</div>
-        <div class="hero-subtitle">Panel interactivo de ventas y segmentacion de clientes</div>
+        <div class="hero-subtitle">Interactive sales and customer segmentation dashboard</div>
         <div class="hero-stats-strip">
             <div class="hero-stat">
-                <div class="hero-stat-label">Periodo</div>
+                <div class="hero-stat-label">Period</div>
                 <div class="hero-stat-value">{date_range_str}</div>
             </div>
             <div class="hero-stat">
-                <div class="hero-stat-label">Registros</div>
+                <div class="hero-stat-label">Records</div>
                 <div class="hero-stat-value">{total_records:,}</div>
             </div>
             <div class="hero-stat">
-                <div class="hero-stat-label">Ciudades</div>
+                <div class="hero-stat-label">Cities</div>
                 <div class="hero-stat-value">{cities_count}</div>
             </div>
         </div>
@@ -747,27 +785,27 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Banner filtros activos
+# Active filters banner
 active_filters = []
 if len(city_sel) < len(cities):
-    active_filters.append(f"**Ciudades:** {', '.join(city_sel)}")
+    active_filters.append(f"**Cities:** {', '.join(city_sel)}")
 if len(product_sel) < len(products):
-    active_filters.append(f"**Productos:** {', '.join(product_sel)}")
+    active_filters.append(f"**Product lines:** {', '.join(product_sel)}")
 if len(gender_sel) < len(genders):
-    active_filters.append(f"**Genero:** {', '.join(gender_sel)}")
+    active_filters.append(f"**Gender:** {', '.join(gender_sel)}")
 if len(payment_sel) < len(payments):
-    active_filters.append(f"**Pago:** {', '.join(payment_sel)}")
+    active_filters.append(f"**Payment:** {', '.join(payment_sel)}")
 if len(ctype_sel) < len(customer_types):
-    active_filters.append(f"**Tipo:** {', '.join(ctype_sel)}")
+    active_filters.append(f"**Customer type:** {', '.join(ctype_sel)}")
 if isinstance(date_range, tuple) and len(date_range) == 2:
     if date_range[0] != min_date or date_range[1] != max_date:
-        active_filters.append(f"**Fechas:** {date_range[0]} a {date_range[1]}")
+        active_filters.append(f"**Dates:** {date_range[0]} to {date_range[1]}")
 
 if active_filters:
     st.info(" · ".join(active_filters))
 
 if df_filtered.empty:
-    st.warning("No hay datos para la combinacion de filtros seleccionada.")
+    st.warning("No data for the selected filter combination.")
     st.stop()
 
 # ==============================================
@@ -801,7 +839,7 @@ def apply_layout(fig, **extra):
 
 
 # ==============================================
-# PERIODO ANTERIOR PARA DELTAS
+# PREVIOUS PERIOD FOR DELTAS
 # ==============================================
 def get_previous_period(df_full, date_range_val):
     if not (isinstance(date_range_val, tuple) and len(date_range_val) == 2):
@@ -835,7 +873,7 @@ def calc_delta_pct(current, previous):
 # TABS
 # ==============================================
 tabs = st.tabs(
-    ["📊 KPIs", "📈 Ventas", "🛒 Productos", "👥 Clientes", "🤖 Modelos", "📥 Datos"]
+    ["📊 KPIs", "📈 Sales", "🛒 Products", "👥 Customers", "🤖 Models", "📥 Data"]
 )
 
 # ===================== TAB 0: KPIs =====================
@@ -856,39 +894,39 @@ with tabs[0]:
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        kpi_card("Ventas Totales", f"${total_sales:,.0f}", "💰",
+        kpi_card("Total Sales", f"${total_sales:,.0f}", "💰",
                  calc_delta_pct(total_sales, prev_sales))
     with c2:
-        kpi_card("Tickets", f"{total_tickets:,}", "🧾",
+        kpi_card("Transactions", f"{total_tickets:,}", "🧾",
                  calc_delta_pct(total_tickets, prev_tickets))
     with c3:
-        kpi_card("Utilidad Total", f"${total_profit:,.0f}", "📈",
+        kpi_card("Total Profit", f"${total_profit:,.0f}", "📈",
                  calc_delta_pct(total_profit, prev_profit))
     with c4:
-        kpi_card("Margen", f"{avg_margin:.1f}%", "📊",
+        kpi_card("Margin", f"{avg_margin:.1f}%", "📊",
                  f"{(avg_margin - prev_margin):+.2f} pp" if prev_margin else None)
 
     st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
 
     c5, c6, c7 = st.columns(3)
     with c5:
-        kpi_card("Ticket Promedio", f"${avg_ticket:,.2f}", "🎫",
+        kpi_card("Average Ticket", f"${avg_ticket:,.2f}", "🎫",
                  calc_delta_pct(avg_ticket, prev_avg_ticket))
     with c6:
-        kpi_card("Rating Promedio", f"{avg_rating:.2f} / 10", "⭐",
+        kpi_card("Average Rating", f"{avg_rating:.2f} / 10", "⭐",
                  f"{(avg_rating - prev_rating):+.2f}" if prev_rating else None)
     with c7:
-        kpi_card("Sucursales", f"{df_filtered['Branch'].nunique()}", "🏪", None)
+        kpi_card("Branches", f"{df_filtered['Branch'].nunique()}", "🏪", None)
 
-# ===================== TAB 1: Ventas =====================
+# ===================== TAB 1: Sales =====================
 with tabs[1]:
     col_opt1, col_opt2 = st.columns(2)
     with col_opt1:
-        freq = st.radio("Agrupacion", ["Diario", "Semanal"], horizontal=True, key="freq_ventas")
+        freq = st.radio("Grouping", ["Daily", "Weekly"], horizontal=True, key="freq_ventas")
     with col_opt2:
-        by_branch = st.checkbox("Desglosar por Sucursal")
+        by_branch = st.checkbox("Split by Branch")
 
-    freq_code = "D" if freq == "Diario" else "W"
+    freq_code = "D" if freq == "Daily" else "W"
 
     if by_branch:
         sales_time = (
@@ -897,7 +935,7 @@ with tabs[1]:
         )
         fig_time = px.line(
             sales_time, x="Date", y="Sales", color="Branch",
-            markers=True, title="Tendencia de Ventas por Sucursal",
+            markers=True, title="Sales Trend by Branch",
         )
     else:
         sales_time = (
@@ -906,7 +944,7 @@ with tabs[1]:
         )
         fig_time = px.line(
             sales_time, x="Date", y="Sales",
-            markers=True, title="Tendencia de Ventas",
+            markers=True, title="Sales Trend",
         )
         fig_time.update_traces(
             line=dict(width=2.5, color=COLORS["primary"]),
@@ -918,16 +956,16 @@ with tabs[1]:
     apply_layout(fig_time)
     st.plotly_chart(fig_time, use_container_width=True)
 
-    # Acumulado real con cumsum
+    # Cumulative total with cumsum
     sales_cum = (
         df_filtered.groupby(pd.Grouper(key="Date", freq=freq_code))["Sales"]
         .sum().reset_index().sort_values("Date")
     )
-    sales_cum["Acumulado"] = sales_cum["Sales"].cumsum()
+    sales_cum["Cumulative"] = sales_cum["Sales"].cumsum()
 
     fig_area = px.area(
-        sales_cum, x="Date", y="Acumulado",
-        title="Ventas Acumuladas",
+        sales_cum, x="Date", y="Cumulative",
+        title="Cumulative Sales",
     )
     fig_area.update_traces(
         line=dict(width=2, color=COLORS["accent"]),
@@ -936,21 +974,21 @@ with tabs[1]:
     apply_layout(fig_area)
     st.plotly_chart(fig_area, use_container_width=True)
 
-# ===================== TAB 2: Productos =====================
+# ===================== TAB 2: Products =====================
 with tabs[2]:
     sales_by_product = (
         df_filtered.groupby("Product line")
-        .agg(Ventas=("Sales", "sum"), Utilidad=("gross income", "sum"))
+        .agg(Sales=("Sales", "sum"), Profit=("gross income", "sum"))
         .reset_index()
-        .sort_values("Ventas")
+        .sort_values("Sales")
     )
 
     col_p1, col_p2 = st.columns(2)
     with col_p1:
         fig_ps = px.bar(
-            sales_by_product, x="Ventas", y="Product line", orientation="h",
-            title="Ventas por Categoria",
-            color="Ventas", color_continuous_scale=["#312e81", "#6366f1", "#a5b4fc"],
+            sales_by_product, x="Sales", y="Product line", orientation="h",
+            title="Sales by Category",
+            color="Sales", color_continuous_scale=["#312e81", "#6366f1", "#a5b4fc"],
         )
         fig_ps.update_traces(marker_line_width=0)
         fig_ps.update_coloraxes(showscale=False)
@@ -959,57 +997,57 @@ with tabs[2]:
 
     with col_p2:
         fig_pp = px.bar(
-            sales_by_product, x="Utilidad", y="Product line", orientation="h",
-            title="Utilidad por Categoria",
-            color="Utilidad", color_continuous_scale=["#064e3b", "#10b981", "#6ee7b7"],
+            sales_by_product, x="Profit", y="Product line", orientation="h",
+            title="Profit by Category",
+            color="Profit", color_continuous_scale=["#064e3b", "#10b981", "#6ee7b7"],
         )
         fig_pp.update_traces(marker_line_width=0)
         fig_pp.update_coloraxes(showscale=False)
         apply_layout(fig_pp)
         st.plotly_chart(fig_pp, use_container_width=True)
 
-    # Ticket promedio
+    # Average ticket
     avg_ticket_prod = (
         df_filtered.groupby("Product line")["Sales"]
         .mean().reset_index()
-        .rename(columns={"Sales": "Ticket Promedio"})
-        .sort_values("Ticket Promedio")
+        .rename(columns={"Sales": "Average Ticket"})
+        .sort_values("Average Ticket")
     )
     fig_at = px.bar(
-        avg_ticket_prod, x="Ticket Promedio", y="Product line", orientation="h",
-        title="Ticket Promedio por Categoria",
-        color="Ticket Promedio", color_continuous_scale=["#4c1d95", "#8b5cf6", "#c4b5fd"],
+        avg_ticket_prod, x="Average Ticket", y="Product line", orientation="h",
+        title="Average Ticket by Category",
+        color="Average Ticket", color_continuous_scale=["#4c1d95", "#8b5cf6", "#c4b5fd"],
     )
     fig_at.update_traces(marker_line_width=0)
     fig_at.update_coloraxes(showscale=False)
     apply_layout(fig_at)
     st.plotly_chart(fig_at, use_container_width=True)
 
-    # Tabla resumen
+    # Summary table
     st.markdown(f'<p style="font-weight:600;font-size:1rem;margin:20px 0 8px">'
-                f'Resumen por Linea de Producto</p>', unsafe_allow_html=True)
+                f'Product Line Summary</p>', unsafe_allow_html=True)
     summary = (
         df_filtered.groupby("Product line")
         .agg(
-            Ventas=("Sales", "sum"),
-            Tickets=("Sales", "count"),
-            Ticket_Promedio=("Sales", "mean"),
-            Utilidad=("gross income", "sum"),
-            Rating_Promedio=("Rating", "mean"),
+            Sales=("Sales", "sum"),
+            Transactions=("Sales", "count"),
+            Avg_Ticket=("Sales", "mean"),
+            Profit=("gross income", "sum"),
+            Avg_Rating=("Rating", "mean"),
         )
         .round(2)
-        .sort_values("Ventas", ascending=False)
+        .sort_values("Sales", ascending=False)
     )
     st.dataframe(summary, use_container_width=True)
 
-# ===================== TAB 3: Clientes =====================
+# ===================== TAB 3: Customers =====================
 with tabs[3]:
     col1, col2 = st.columns(2)
     with col1:
         gender_seg = df_filtered.groupby("Gender")["Sales"].sum().reset_index()
         fig_g = px.pie(
             gender_seg, names="Gender", values="Sales",
-            title="Ventas por Genero",
+            title="Sales by Gender",
             hole=0.45,
             color_discrete_sequence=[COLORS["primary"], COLORS["accent4"]],
         )
@@ -1021,7 +1059,7 @@ with tabs[3]:
         payment_seg = df_filtered.groupby("Payment")["Sales"].sum().reset_index()
         fig_p = px.pie(
             payment_seg, names="Payment", values="Sales",
-            title="Ventas por Metodo de Pago",
+            title="Sales by Payment Method",
             hole=0.45,
             color_discrete_sequence=[COLORS["primary"], COLORS["accent"], COLORS["accent2"]],
         )
@@ -1031,14 +1069,14 @@ with tabs[3]:
 
     # Member vs Normal
     st.markdown(f'<p style="font-weight:600;font-size:1rem;margin:20px 0 8px">'
-                f'Miembros vs Normales</p>', unsafe_allow_html=True)
+                f'Members vs Normal</p>', unsafe_allow_html=True)
     member_stats = (
         df_filtered.groupby("Customer type")
         .agg(
-            Ventas=("Sales", "sum"),
-            Tickets=("Sales", "count"),
-            Ticket_Promedio=("Sales", "mean"),
-            Rating_Promedio=("Rating", "mean"),
+            Sales=("Sales", "sum"),
+            Transactions=("Sales", "count"),
+            Avg_Ticket=("Sales", "mean"),
+            Avg_Rating=("Rating", "mean"),
         )
         .round(2)
     )
@@ -1047,8 +1085,8 @@ with tabs[3]:
     col_m1, col_m2 = st.columns(2)
     with col_m1:
         fig_mv = px.bar(
-            member_stats.reset_index(), x="Customer type", y="Ventas",
-            title="Ventas: Miembros vs Normales",
+            member_stats.reset_index(), x="Customer type", y="Sales",
+            title="Sales: Members vs Normal",
             color="Customer type",
             color_discrete_sequence=[COLORS["primary"], COLORS["accent"]],
         )
@@ -1057,8 +1095,8 @@ with tabs[3]:
         st.plotly_chart(fig_mv, use_container_width=True)
     with col_m2:
         fig_mr = px.bar(
-            member_stats.reset_index(), x="Customer type", y="Rating_Promedio",
-            title="Rating Promedio por Tipo",
+            member_stats.reset_index(), x="Customer type", y="Avg_Rating",
+            title="Average Rating by Type",
             color="Customer type",
             color_discrete_sequence=[COLORS["primary"], COLORS["accent"]],
         )
@@ -1072,33 +1110,33 @@ with tabs[3]:
     )
     fig_tm = px.treemap(
         sales_treemap, path=["Product line", "Gender"], values="Sales",
-        title="Distribucion de Ventas por Categoria y Genero",
+        title="Sales Distribution by Category and Gender",
         color="Sales", color_continuous_scale="Viridis",
     )
     fig_tm.update_coloraxes(showscale=False)
     apply_layout(fig_tm)
     st.plotly_chart(fig_tm, use_container_width=True)
 
-    # Rating por segmento
+    # Rating by segment
     rating_seg = (
         df_filtered.groupby(["Gender", "Customer type"])["Rating"].mean().reset_index()
     )
     fig_rs = px.bar(
         rating_seg, x="Gender", y="Rating", color="Customer type",
-        barmode="group", title="Rating Promedio por Genero y Tipo de Cliente",
+        barmode="group", title="Average Rating by Gender and Customer Type",
         color_discrete_sequence=[COLORS["primary"], COLORS["accent"]],
     )
     fig_rs.update_traces(marker_line_width=0)
     apply_layout(fig_rs)
     st.plotly_chart(fig_rs, use_container_width=True)
 
-# ===================== TAB 4: Modelos =====================
+# ===================== TAB 4: Models =====================
 with tabs[4]:
     # ---------- HEATMAP ----------
     st.markdown(f'<p style="font-weight:600;font-size:1.1rem;margin-bottom:12px">'
-                f'Mapa de Calor: Ventas por Dia y Hora</p>', unsafe_allow_html=True)
+                f'Heatmap: Sales by Day and Hour</p>', unsafe_allow_html=True)
 
-    hm_mode = st.radio("Metrica del Heatmap", ["Total", "Promedio"], horizontal=True, key="hm_mode")
+    hm_mode = st.radio("Heatmap metric", ["Total", "Average"], horizontal=True, key="hm_mode")
 
     df_hm = df_filtered.copy()
     df_hm["weekday"] = df_hm["Date"].dt.day_name()
@@ -1121,26 +1159,26 @@ with tabs[4]:
     )
     pivot = heatmap_data.pivot(index="weekday", columns="hour", values="Sales").fillna(0)
 
-    label_color = f"Ventas {'Total' if hm_mode == 'Total' else 'Promedio'} ($)"
+    label_color = f"{'Total' if hm_mode == 'Total' else 'Average'} Sales ($)"
     fig_hm = px.imshow(
         pivot,
-        labels=dict(x="Hora del Dia", y="Dia de la Semana", color=label_color),
+        labels=dict(x="Hour of Day", y="Day of Week", color=label_color),
         aspect="auto",
         color_continuous_scale="Viridis",
         text_auto=".0f",
     )
     apply_layout(fig_hm, xaxis=dict(side="top"),
-                 title=f"Intensidad de Ventas por Dia y Hora ({hm_mode})")
+                 title=f"Sales Intensity by Day and Hour ({hm_mode})")
     st.plotly_chart(fig_hm, use_container_width=True)
 
     st.markdown("---")
 
     # ---------- CLUSTERING ----------
     st.markdown(f'<p style="font-weight:600;font-size:1.1rem;margin-bottom:4px">'
-                f'Segmentacion de Clientes (K-Means)</p>', unsafe_allow_html=True)
+                f'Customer Segmentation (K-Means)</p>', unsafe_allow_html=True)
     st.caption(
-        "Nota: Se agrupa por Invoice ID, que no necesariamente representa un cliente unico. "
-        "Los resultados son orientativos."
+        "Note: Grouped by Invoice ID, which may not represent a unique customer. "
+        "Results are indicative."
     )
 
     if SKLEARN_AVAILABLE:
@@ -1154,9 +1192,9 @@ with tabs[4]:
         max_k = min(6, len(customer) - 1) if len(customer) > 2 else 2
 
         if len(customer) < 3:
-            st.warning("No hay suficientes datos para clustering con los filtros actuales.")
+            st.warning("Not enough data for clustering with the current filters.")
         else:
-            k = st.slider("Numero de clusters (k)", 2, max_k, min(3, max_k))
+            k = st.slider("Number of clusters (k)", 2, max_k, min(3, max_k))
 
             scaler = StandardScaler()
             X = scaler.fit_transform(customer[["total_sales", "total_qty", "avg_rating"]])
@@ -1172,7 +1210,7 @@ with tabs[4]:
 
             fig_cl = px.scatter_3d(
                 customer, x="total_sales", y="total_qty", z="avg_rating",
-                color="cluster", title=f"Clusters de Clientes (k={k})",
+                color="cluster", title=f"Customer Clusters (k={k})",
                 color_discrete_sequence=PALETTE,
             )
             apply_layout(fig_cl)
@@ -1180,7 +1218,7 @@ with tabs[4]:
 
             # Elbow
             st.markdown(f'<p style="font-weight:600;font-size:1rem;margin:16px 0 8px">'
-                        f'Grafico de Codo (Elbow)</p>', unsafe_allow_html=True)
+                        f'Elbow Chart</p>', unsafe_allow_html=True)
             max_elbow = min(8, len(customer) - 1)
             if max_elbow >= 2:
                 inertias = []
@@ -1192,8 +1230,8 @@ with tabs[4]:
 
                 fig_elbow = px.line(
                     x=k_range, y=inertias, markers=True,
-                    title="Metodo del Codo",
-                    labels={"x": "k (clusters)", "y": "Inercia"},
+                    title="Elbow Method",
+                    labels={"x": "k (clusters)", "y": "Inertia"},
                 )
                 fig_elbow.update_traces(
                     line=dict(width=2.5, color=COLORS["accent2"]),
@@ -1203,36 +1241,36 @@ with tabs[4]:
                 st.plotly_chart(fig_elbow, use_container_width=True)
 
             st.markdown(f'<p style="font-weight:600;font-size:1rem;margin:16px 0 8px">'
-                        f'Detalle por Cluster</p>', unsafe_allow_html=True)
+                        f'Cluster Details</p>', unsafe_allow_html=True)
             st.dataframe(customer, use_container_width=True)
     else:
-        st.warning("scikit-learn no esta instalado. Instala con: `pip install scikit-learn`")
+        st.warning("scikit-learn is not installed. Install with: `pip install scikit-learn`")
 
-# ===================== TAB 5: Datos =====================
+# ===================== TAB 5: Data =====================
 with tabs[5]:
     st.markdown(f'<p style="color:{COLORS["text_muted"]};font-size:0.9rem;margin-bottom:12px">'
-                f'Mostrando <b>{len(df_filtered):,}</b> registros filtrados</p>',
+                f'Showing <b>{len(df_filtered):,}</b> filtered records</p>',
                 unsafe_allow_html=True)
 
     st.dataframe(df_filtered, use_container_width=True, height=420)
 
     csv = df_filtered.to_csv(index=False).encode("utf-8")
     st.download_button(
-        label="Descargar datos filtrados (CSV)",
+        label="Download filtered data (CSV)",
         data=csv,
-        file_name="supermarket_datos_filtrados.csv",
+        file_name="supermarket_filtered_data.csv",
         mime="text/csv",
     )
 
 # ==============================================
-# PIE DE PAGINA
+# FOOTER
 # ==============================================
 st.markdown(
     '''
     <div class="glass-footer">
-        <p>Dashboard desarrollado con
+        <p>Dashboard built with
         <a href="https://streamlit.io" target="_blank">Streamlit</a>,
-        <a href="https://plotly.com" target="_blank">Plotly</a> y
+        <a href="https://plotly.com" target="_blank">Plotly</a> and
         <a href="https://scikit-learn.org" target="_blank">scikit-learn</a>
         </p>
     </div>

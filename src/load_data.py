@@ -2,7 +2,7 @@ import pandas as pd
 import sqlite3
 from pathlib import Path
 
-# Paths absolutos basados en la ubicación de este archivo
+# Absolute paths based on this file's location
 _BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_PATH = _BASE_DIR / "data" / "SuperMarket.csv"
 DB_DIR = _BASE_DIR / "database"
@@ -11,23 +11,23 @@ DB_PATH = DB_DIR / "sales.db"
 
 def load_csv_to_sqlite():
     if not DATA_PATH.exists():
-        print(f"ERROR: No se encontró el archivo CSV en {DATA_PATH}")
+        print(f"ERROR: CSV file not found at {DATA_PATH}")
         return
 
-    # Crear directorio de base de datos si no existe
+    # Create database directory if it doesn't exist
     DB_DIR.mkdir(exist_ok=True)
 
-    # Leer CSV
+    # Read CSV
     df = pd.read_csv(DATA_PATH)
 
-    # Conectar a SQLite
+    # Connect to SQLite
     conn = sqlite3.connect(DB_PATH)
 
-    # Guardar la tabla
+    # Write table
     df.to_sql("sales", conn, if_exists="replace", index=False)
 
     conn.close()
-    print("Datos cargados correctamente en SQLite.")
+    print("Data loaded successfully into SQLite.")
 
 
 if __name__ == "__main__":

@@ -1,109 +1,112 @@
 # 🛒 SuperMarket Analytics Dashboard — Glassmorphism Edition
 
-Dashboard interactivo en Streamlit para analisis de ventas, comportamiento de clientes y visualizaciones avanzadas, basado en datos reales de supermercados. Incluye KPIs animados, visualizaciones dinamicas, clustering y heatmaps con un diseno **glassmorphism** moderno y profesional.
+Interactive Streamlit dashboard for sales analysis, customer behavior, and advanced visualizations using real supermarket data. Includes animated KPIs, dynamic charts, clustering, and heatmaps with a modern, professional glassmorphism design.
 
-## ✨ Caracteristicas
+## 🎬 Demo
 
-### 📊 KPIs Interactivos
+![Dashboard demo](video.gif)
 
-Tarjetas con efecto vidrio esmerilado (glassmorphism) y animaciones:
+## ✨ Features
 
-- 💰 Ventas Totales con delta vs periodo anterior
-- 🧾 Tickets generados
-- 📈 Utilidad total
-- 📊 Margen promedio
-- 🎫 Ticket promedio
-- ⭐ Rating promedio
-- 🏪 Sucursales activas
+### 📊 Interactive KPIs
 
-### 📈 Analisis de Ventas
+Glassmorphism cards with animations:
 
-- Tendencia diaria/semanal con opcion de desglose por sucursal
-- Ventas acumuladas con area chart
-- Filtros interactivos en sidebar
+- 💰 Total sales with delta vs previous period
+- 🧾 Transactions
+- 📈 Total profit
+- 📊 Average margin
+- 🎫 Average ticket
+- ⭐ Average rating
+- 🏪 Active branches
 
-### 🛒 Analisis por Categoria de Producto
+### 📈 Sales Analysis
 
-- Ventas y utilidad por linea de producto (barras horizontales)
-- Ticket promedio por categoria
-- Tabla resumen con metricas agregadas
+- Daily/weekly trend with optional branch split
+- Cumulative sales area chart
+- Interactive sidebar filters
 
-### 👥 Analisis de Clientes
+### 🛒 Product Category Analysis
 
-- Ventas por genero y metodo de pago (donut charts)
-- Comparacion Miembros vs Normales
-- Treemap de distribucion de ventas
-- Rating por segmento
+- Sales and profit by product line (horizontal bars)
+- Average ticket by category
+- Summary table with aggregated metrics
 
-### 🤖 Modelos AI
+### 👥 Customer Analysis
 
-- 🔥 Heatmap avanzado: ventas por hora x dia de la semana (total/promedio)
-- 🧩 Clustering K-Means con visualizacion 3D interactiva
-- Silhouette Score y grafico del Codo (Elbow)
-- Tabla de detalle por cluster
+- Sales by gender and payment method (donut charts)
+- Members vs Normal comparison
+- Sales distribution treemap
+- Rating by segment
 
-### 📥 Datos
+### 🤖 AI Models
 
-- Visualizacion de datos filtrados en tabla interactiva
-- Descarga de datos en formato CSV
+- 🔥 Advanced heatmap: sales by hour x day of week (total/average)
+- 🧩 K-Means clustering with interactive 3D visualization
+- Silhouette Score and Elbow chart
+- Cluster detail table
 
-## 🎨 Diseno Glassmorphism
+### 📥 Data
 
-El dashboard utiliza un sistema de diseno **glassmorphism** con:
+- Filtered data table
+- CSV download
 
-- **Efecto vidrio esmerilado**: `backdrop-filter: blur()` en tarjetas, sidebar, tabs y graficos
-- **Fondo con gradient mesh animado**: Gradientes radiales sutiles con animacion pulsante
-- **Hero header**: Titulo con gradiente animado y strip de estadisticas rapidas
-- **Sidebar premium**: Logo animado con gradiente, secciones estilizadas
-- **KPI cards con efectos**: Bordes con gradiente animado, shimmer al hover, elevacion y glow
-- **Tabs con glow**: Estilo pill con efecto luminoso en tab activa
-- **Charts en contenedores glass**: Cada grafico envuelto en contenedor con efecto vidrio
-- **Animaciones CSS**: fadeInUp, shimmer, pulse, glowPulse, gradientShift, borderGlow
-- **Footer glass**: Con links estilizados y efecto hover luminoso
-- **Responsive**: Ajustes automaticos para pantallas pequenas
+## 🎨 Glassmorphism Design
 
-### Paleta de Colores
+The dashboard uses a **glassmorphism** design system with:
 
-| Color | Hex | Uso |
+- **Frosted glass effect**: `backdrop-filter: blur()` on cards, sidebar, tabs, and charts
+- **Animated gradient mesh background**: subtle radial gradients with pulsing animation
+- **Hero header**: animated gradient title and quick stats strip
+- **Premium sidebar**: animated logo and styled sections
+- **KPI cards with effects**: animated gradient borders, hover shimmer, elevation, and glow
+- **Glowing tabs**: pill style with luminous active tab
+- **Glass chart containers**: each chart wrapped in a glass container
+- **CSS animations**: fadeInUp, shimmer, pulse, glowPulse, gradientShift, borderGlow
+- **Glass footer**: styled links with glow hover
+- **Responsive**: automatic adjustments for small screens
+
+### Color Palette
+
+| Color | Hex | Use |
 |-------|-----|-----|
-| Indigo | `#6366f1` | Color primario |
-| Indigo Light | `#818cf8` | Gradientes y acentos |
-| Emerald | `#10b981` | Indicadores positivos |
-| Amber | `#f59e0b` | Advertencias |
-| Red | `#ef4444` | Indicadores negativos |
-| Pink | `#ec4899` | Acentos secundarios |
-| Cyan | `#06b6d4` | Graficos |
-| Violet | `#8b5cf6` | Bordes glass |
+| Indigo | `#6366f1` | Primary color |
+| Indigo Light | `#818cf8` | Gradients and accents |
+| Emerald | `#10b981` | Positive indicators |
+| Amber | `#f59e0b` | Warnings |
+| Red | `#ef4444` | Negative indicators |
+| Pink | `#ec4899` | Secondary accents |
+| Cyan | `#06b6d4` | Charts |
+| Violet | `#8b5cf6` | Glass borders |
 
-## 🗂️ Estructura del Proyecto
+## 🗂️ Project Structure
 
 ```
 supermarket-dashboard/
 ├── data/
-│   └── SuperMarket.csv          # Datos fuente (1,000 registros)
+│   └── SuperMarket.csv          # Source data (1,000 records)
 ├── database/
-│   └── sales.db                 # Base de datos SQLite (generada)
+│   └── sales.db                 # SQLite database (generated)
 ├── src/
-│   ├── app.py                   # Dashboard principal Streamlit
-│   └── load_data.py             # Script ETL: CSV → SQLite
-├── .streamlit/
-│   └── config.toml              # Configuracion del tema
-├── requirements.txt
-├── CLAUDE.md
+│   ├── app.py                   # Main Streamlit dashboard
+│   └── load_data.py             # ETL script: CSV → SQLite
+├── .gitignore
 ├── README.md
-└── venv/                        # Entorno virtual (opcional)
+├── requirements.txt
+├── .venv/                       # Virtual environment (optional, local)
+└── .vscode/                     # Editor settings (optional, local)
 ```
 
-## ⚙️ Instalacion
+## ⚙️ Installation
 
-### 1. Clonar
+### 1. Clone
 
 ```bash
 git clone https://github.com/lvant/supermarket-dashboard.git
 cd supermarket-dashboard
 ```
 
-### 2. Crear entorno virtual (opcional)
+### 2. Create a virtual environment (optional)
 
 ```bash
 python3 -m venv venv
@@ -111,49 +114,49 @@ source venv/bin/activate   # Mac/Linux
 venv\Scripts\activate      # Windows
 ```
 
-### 3. Instalar dependencias
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Cargar datos en SQLite
+### 4. Load data into SQLite
 
 ```bash
 python src/load_data.py
 ```
 
-### 5. Ejecutar
+### 5. Run
 
 ```bash
 streamlit run src/app.py
 ```
 
-## 📦 Base de Datos
+## 📦 Database
 
-El archivo SQLite se genera en `database/sales.db` a partir del CSV fuente.
+The SQLite file is generated at `database/sales.db` from the source CSV.
 
-| Campo | Descripcion |
+| Field | Description |
 |-------|-------------|
-| Invoice ID | ID del ticket |
-| Branch | Sucursal (A, B, C) |
-| City | Ciudad |
-| Customer type | Miembro o Normal |
-| Gender | Genero |
-| Product line | Categoria de producto |
-| Unit price | Precio unitario |
-| Quantity | Cantidad |
-| Tax 5% | Impuesto |
-| Sales | Valor de venta |
-| Date | Fecha |
-| Time | Hora |
-| Payment | Forma de pago |
-| cogs | Costo de bienes |
-| gross margin percentage | Margen bruto % |
-| gross income | Utilidad bruta |
-| Rating | Calificacion (1-10) |
+| Invoice ID | Receipt ID |
+| Branch | Branch (A, B, C) |
+| City | City |
+| Customer type | Member or Normal |
+| Gender | Gender |
+| Product line | Product category |
+| Unit price | Unit price |
+| Quantity | Quantity |
+| Tax 5% | Tax |
+| Sales | Sales value |
+| Date | Date |
+| Time | Time |
+| Payment | Payment method |
+| cogs | Cost of goods sold |
+| gross margin percentage | Gross margin % |
+| gross income | Gross income |
+| Rating | Rating (1-10) |
 
-## 🧠 Dependencias
+## 🧠 Dependencies
 
 ```
 streamlit==1.39.0
@@ -163,17 +166,4 @@ plotly==5.24.1
 scikit-learn==1.5.2
 ```
 
-> Si scikit-learn no esta disponible, la pestana de Modelos muestra un aviso y el resto del dashboard funciona normalmente.
-
-## 🤝 Contribuciones
-
-Pull requests abiertos. Ideas sugeridas:
-
-- Panel de prediccion avanzado (Prophet/series de tiempo)
-- Dashboard movil optimizado
-- Sistema de alertas con umbrales configurables
-- Modo claro/oscuro con toggle
-
-## 📄 Licencia
-
-Este proyecto utiliza la licencia MIT.
+> If scikit-learn is not available, the Models tab shows a warning and the rest of the dashboard works normally.

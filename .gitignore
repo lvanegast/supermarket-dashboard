@@ -2,26 +2,9 @@
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
 
 # Virtual environments
+.venv/
 venv/
 env/
 ENV/
@@ -30,14 +13,14 @@ ENV/
 .vscode/
 .idea/
 
-# Streamlit
-.streamlit/
+# Streamlit (keep config, ignore secrets)
+.streamlit/secrets.toml
 
 # Database (generated files)
-database/sales.db
+database/*.db
 
 # Logs
-log/
+*.log
 
 # OS generated files
 .DS_Store
@@ -45,4 +28,3 @@ Thumbs.db
 
 # Temporary files
 *.tmp
-*.log
