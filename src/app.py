@@ -25,7 +25,7 @@ except Exception:
 # ==============================================
 # PAGE CONFIG
 # ==============================================
-st.set_page_config(page_title="SuperMarket Analytics", page_icon="🛒", layout="wide")
+st.set_page_config(page_title="SuperMarket Ac", page_icon="🛒", layout="wide")
 
 # ==============================================
 # COLOR PALETTE AND DESIGN CONSTANTS
@@ -85,6 +85,12 @@ st.markdown(f"""
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     --glass-blur: 16px;
     --animation-speed: 0.6s;
+    --filter-surface: rgba(30, 30, 47, 0.72);
+    --filter-surface-hover: rgba(41, 46, 74, 0.88);
+    --filter-border: rgba(129, 140, 248, 0.24);
+    --filter-border-strong: rgba(165, 180, 252, 0.5);
+    --filter-chip-bg: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(129, 140, 248, 0.2));
+    --filter-chip-text: #e0e7ff;
 }}
 
 /* ---- Global Styles ---- */
@@ -233,9 +239,61 @@ section[data-testid="stSidebar"] > div {{
 
 section[data-testid="stSidebar"] .stMultiSelect > div,
 section[data-testid="stSidebar"] .stDateInput > div > div {{
-    background: rgba(30, 30, 47, 0.5) !important;
-    border: 1px solid rgba(139, 92, 246, 0.2) !important;
-    border-radius: 10px !important;
+    background: var(--filter-surface) !important;
+    border: 1px solid var(--filter-border) !important;
+    border-radius: 12px !important;
+    transition: all 0.25s ease !important;
+}}
+
+section[data-testid="stSidebar"] .stMultiSelect label,
+section[data-testid="stSidebar"] .stDateInput label {{
+    color: {COLORS["text"]} !important;
+    font-weight: 600 !important;
+}}
+
+section[data-testid="stSidebar"] .stMultiSelect [data-baseweb="select"] > div,
+section[data-testid="stSidebar"] .stDateInput input {{
+    background: transparent !important;
+    color: {COLORS["text"]} !important;
+}}
+
+section[data-testid="stSidebar"] .stMultiSelect [data-baseweb="select"] > div:hover,
+section[data-testid="stSidebar"] .stDateInput > div > div:hover {{
+    background: var(--filter-surface-hover) !important;
+    border-color: rgba(129, 140, 248, 0.35) !important;
+}}
+
+section[data-testid="stSidebar"] .stMultiSelect [data-baseweb="select"] > div:focus-within,
+section[data-testid="stSidebar"] .stDateInput > div > div:focus-within {{
+    border-color: var(--filter-border-strong) !important;
+    box-shadow: 0 0 0 1px rgba(165, 180, 252, 0.18),
+                0 0 20px rgba(99, 102, 241, 0.12) !important;
+}}
+
+section[data-testid="stSidebar"] .stMultiSelect [data-baseweb="tag"] {{
+    background: var(--filter-chip-bg) !important;
+    border: 1px solid rgba(165, 180, 252, 0.3) !important;
+    border-radius: 999px !important;
+    color: var(--filter-chip-text) !important;
+}}
+
+section[data-testid="stSidebar"] .stMultiSelect [data-baseweb="tag"] span,
+section[data-testid="stSidebar"] .stMultiSelect [data-baseweb="tag"] svg {{
+    color: var(--filter-chip-text) !important;
+    fill: var(--filter-chip-text) !important;
+}}
+
+section[data-testid="stSidebar"] .stMultiSelect [role="option"][aria-selected="true"] {{
+    background: rgba(99, 102, 241, 0.2) !important;
+}}
+
+section[data-testid="stSidebar"] .stMultiSelect [role="option"]:hover {{
+    background: rgba(129, 140, 248, 0.12) !important;
+}}
+
+section[data-testid="stSidebar"] .stDateInput input::placeholder,
+section[data-testid="stSidebar"] .stMultiSelect input::placeholder {{
+    color: {COLORS["text_muted"]} !important;
 }}
 
 /* ==========================================
