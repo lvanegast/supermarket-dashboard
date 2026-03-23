@@ -27,6 +27,8 @@ except Exception:
 # ==============================================
 st.set_page_config(page_title="SuperMarket Ac", page_icon="🛒", layout="wide")
 
+st.title("Server working 🚀")
+
 # ==============================================
 # COLOR PALETTE AND DESIGN CONSTANTS
 # ==============================================
