@@ -1,0 +1,26 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Deploy to EC2 via SSH
+      uses: appleboy/ssh-action@v0.1.10
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USER }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          cd ~/supermarket-dashboard
+          git pull origin main
+          pkill -f streamlit || true
+          nohup streamlit run src/app.py --server.address 0.0.0.0 --server.port 8501 > output.log 2>&1 &
