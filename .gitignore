@@ -18,6 +18,8 @@ ENV/
 
 # Database (generated files)
 database/*.db
+database/*.duckdb
+*.parquet
 
 # Logs
 *.log
