@@ -162,3 +162,185 @@ def plot_sales_heatmap(df: pd.DataFrame, metric: str = "Total") -> go.Figure:
     )
     fig.update_xaxes(side="top")
     return apply_theme(fig)
+
+
+def plot_capital_flow_sankey(df: pd.DataFrame) -> go.Figure:
+    """Generate an interactive Sankey diagram of capital flow: Branch -> Product Line -> Payment."""
+    branches = sorted(df["Branch"].unique().tolist())
+    products = sorted(df["Product line"].unique().tolist())
+    payments = sorted(df["Payment"].unique().tolist())
+
+    nodes = branches + products + payments
+    node_indices = {name: i for i, name in enumerate(nodes)}
+
+    sources: list[int] = []
+    targets: list[int] = []
+    values: list[float] = []
+
+    # Branch -> Product Line
+    bp = df.groupby(["Branch", "Product line"])["Sales"].sum().reset_index()
+    for _, row in bp.iterrows():
+        sources.append(node_indices[row["Branch"]])
+        targets.append(node_indices[row["Product line"]])
+        values.append(float(row["Sales"]))
+
+    # Product Line -> Payment
+    pp = df.groupby(["Product line", "Payment"])["Sales"].sum().reset_index()
+    for _, row in pp.iterrows():
+        sources.append(node_indices[row["Product line"]])
+        targets.append(node_indices[row["Payment"]])
+        values.append(float(row["Sales"]))
+
+    node_colors = (
+        ["#6366F1"] * len(branches)
+        + ["#06B6D4"] * len(products)
+        + ["#10B981"] * len(payments)
+    )
+
+    fig = go.Figure(
+        data=[
+            go.Sankey(
+                arrangement="snap",
+                node=dict(
+                    pad=18,
+                    thickness=20,
+                    line=dict(color="rgba(255, 255, 255, 0.2)", width=1),
+                    label=nodes,
+                    color=node_colors,
+                    hovertemplate="<b>%{label}</b><br>Volumen total: $%{value:,.2f}<extra></extra>",
+                ),
+                link=dict(
+                    source=sources,
+                    target=targets,
+                    value=values,
+                    color="rgba(99, 102, 241, 0.22)",
+                    hovertemplate="Flujo: <b>%{source.label}</b> ➔ <b>%{target.label}</b><br>Monto: $%{value:,.2f}<extra></extra>",
+                ),
+            )
+        ]
+    )
+
+    fig.update_layout(
+        title=dict(text="Diagrama de Sankey: Flujo de Dinero (Sucursal ➔ Categoría ➔ Medio de Pago)"),
+        font=dict(family="Plus Jakarta Sans, sans-serif", size=12, color="#F8FAFC"),
+        margin=dict(l=10, r=10, t=40, b=20),
+    )
+    return apply_theme(fig)
+
+
+def plot_branch_radar_benchmark(df: pd.DataFrame) -> go.Figure:
+    """Generate a multi-dimensional radar benchmark chart comparing all branches."""
+    branch_agg = df.groupby("Branch").agg(
+        Sales=("Sales", "sum"),
+        GrossIncome=("gross income", "sum"),
+        Rating=("Rating", "mean"),
+        Quantity=("Quantity", "sum"),
+        Tx=("Invoice ID", "count"),
+    ).reset_index()
+
+    branch_agg["AvgTicket"] = branch_agg["Sales"] / branch_agg["Tx"]
+
+    metrics = ["Sales", "GrossIncome", "Rating", "Quantity", "AvgTicket"]
+    labels = ["Ventas ($)", "Ganancia ($)", "Satisfacción ⭐", "Volumen Uds.", "Ticket Prom. ($)"]
+
+    # Normalize 20 - 100 for visual balance on radar
+    norm_df = branch_agg.copy()
+    for m in metrics:
+        min_v = norm_df[m].min()
+        max_v = norm_df[m].max()
+        rng = max_v - min_v if max_v != min_v else 1.0
+        norm_df[m] = 20 + ((norm_df[m] - min_v) / rng) * 80
+
+    fig = go.Figure()
+    colors = [COLORS["primary"], COLORS["emerald"], COLORS["amber"], COLORS["cyan"]]
+
+    for idx, (_, row) in enumerate(norm_df.iterrows()):
+        vals = [float(row[m]) for m in metrics]
+        vals.append(vals[0])  # close polygon
+        b_name = row["Branch"]
+        c = colors[idx % len(colors)]
+        
+        # Real values for hover
+        real_row = branch_agg[branch_agg["Branch"] == b_name].iloc[0]
+        hover_txt = (
+            f"<b>Sucursal {b_name}</b><br>"
+            f"Ventas: ${real_row['Sales']:,.2f}<br>"
+            f"Ganancia: ${real_row['GrossIncome']:,.2f}<br>"
+            f"Satisfacción: {real_row['Rating']:.2f}/10<br>"
+            f"Volumen: {int(real_row['Quantity']):,} uds<br>"
+            f"Ticket: ${real_row['AvgTicket']:.2f}<extra></extra>"
+        )
+
+        fig.add_trace(
+            go.Scatterpolar(
+                r=vals,
+                theta=labels + [labels[0]],
+                fill="toself",
+                name=f"Sucursal {b_name}",
+                line=dict(color=c, width=2.5),
+                fillcolor=c.replace("rgb", "rgba").replace(")", ", 0.18)") if "rgb" in c else "rgba(99, 102, 241, 0.15)",
+                hoverinfo="text",
+                hovertext=hover_txt,
+            )
+        )
+
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, 105], showticklabels=False, gridcolor="rgba(255,255,255,0.08)"),
+            angularaxis=dict(gridcolor="rgba(255,255,255,0.08)", linecolor="rgba(255,255,255,0.15)"),
+            bgcolor="rgba(0,0,0,0)",
+        ),
+        title=dict(text="Benchmark Multidimensional de Sucursales (Radar Index)"),
+        showlegend=True,
+    )
+    return apply_theme(fig)
+
+
+def plot_target_gauge(
+    current_val: float,
+    target_val: float,
+    title: str,
+    suffix: str = "%",
+    max_range: float = 10.0,
+) -> go.Figure:
+    """Generate a sleek speedometer / gauge chart comparing current value vs target."""
+    fig = go.Figure(
+        go.Indicator(
+            mode="gauge+number+delta",
+            value=current_val,
+            number={"suffix": suffix, "font": {"size": 28, "color": "#F8FAFC"}},
+            delta={
+                "reference": target_val,
+                "position": "bottom",
+                "suffix": suffix,
+                "increasing": {"color": COLORS["emerald"]},
+                "decreasing": {"color": COLORS["rose"]},
+            },
+            title={"text": f"<b>{title}</b><br><span style='font-size:0.75em;color:#94A3B8'>Meta: {target_val}{suffix}</span>", "font": {"size": 14, "color": "#E2E8F0"}},
+            gauge={
+                "axis": {"range": [0, max_range], "tickwidth": 1, "tickcolor": "rgba(255,255,255,0.2)"},
+                "bar": {"color": COLORS["primary"], "thickness": 0.28},
+                "bgcolor": "rgba(255, 255, 255, 0.05)",
+                "borderwidth": 1,
+                "bordercolor": "rgba(255, 255, 255, 0.1)",
+                "steps": [
+                    {"range": [0, target_val * 0.8], "color": "rgba(239, 68, 68, 0.15)"},
+                    {"range": [target_val * 0.8, target_val], "color": "rgba(245, 158, 11, 0.15)"},
+                    {"range": [target_val, max_range], "color": "rgba(16, 185, 129, 0.15)"},
+                ],
+                "threshold": {
+                    "line": {"color": "#10B981", "width": 3},
+                    "thickness": 0.8,
+                    "value": target_val,
+                },
+            },
+        )
+    )
+
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=20, r=20, t=50, b=20),
+        height=220,
+    )
+    return fig
