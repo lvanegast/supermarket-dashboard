@@ -56,6 +56,12 @@ with col_quick:
         "Horizonte temporal rápido",
         options=["Todo el período", "Últimos 60 días", "Últimos 30 días", "Últimos 14 días"],
         default="Todo el período",
+        format_func=lambda x: {
+            "Todo el período": "🌐 Todo",
+            "Últimos 60 días": "📅 60D",
+            "Últimos 30 días": "🗓️ 30D",
+            "Últimos 14 días": "⚡ 14D",
+        }.get(x, x),
         selection_mode="single",
         label_visibility="collapsed",
     )
@@ -64,13 +70,13 @@ with col_quick:
 df = df_filtered.copy()
 max_dataset_date = df["Date"].max()
 
-if quick_preset == "Últimos 14 días":
+if quick_preset in ["Últimos 14 días", "14D"]:
     cutoff = max_dataset_date - timedelta(days=14)
     df = df[df["Date"] >= cutoff]
-elif quick_preset == "Últimos 30 días":
+elif quick_preset in ["Últimos 30 días", "30D"]:
     cutoff = max_dataset_date - timedelta(days=30)
     df = df[df["Date"] >= cutoff]
-elif quick_preset == "Últimos 60 días":
+elif quick_preset in ["Últimos 60 días", "60D"]:
     cutoff = max_dataset_date - timedelta(days=60)
     df = df[df["Date"] >= cutoff]
 
@@ -103,8 +109,118 @@ tx_spark = daily_group["Sales"].count().fillna(0).tolist()
 profit_spark = daily_group["gross income"].sum().fillna(0).tolist()
 ticket_spark = (daily_group["Sales"].sum() / daily_group["Sales"].count().replace(0, 1)).fillna(0).tolist()
 
-# 5. Primary Executive KPI Row (Horizontal container with sparklines)
-with st.container(horizontal=True):
+top_branch = df.groupby("Branch")["Sales"].sum().idxmax()
+top_branch_sales = df.groupby("Branch")["Sales"].sum().max()
+top_prod = df.groupby("Product line")["Sales"].sum().idxmax()
+
+# Interactive Action Toolbar
+with st.container():
+    c_bar_info, c_bar_refresh, c_bar_alerts, c_bar_download = st.columns(
+        [1.6, 0.15, 0.15, 0.15], vertical_alignment="center"
+    )
+    with c_bar_info:
+        st.markdown(
+            f'<div class="badge-status-pulse"><div class="pulse-dot"></div> Sistema activo · Sucursal destacada: <b>{top_branch}</b> (${top_branch_sales:,.0f})</div>',
+            unsafe_allow_html=True,
+        )
+    with c_bar_refresh:
+        if st.button("", icon=":material/refresh:", help="Refrescar caché de datos y métricas", key="btn_refresh_exec"):
+            st.cache_data.clear()
+            st.toast("Datos y métricas actualizados", icon=":material/check_circle:")
+            st.rerun()
+    with c_bar_alerts:
+        with st.popover("", icon=":material/bolt:", help="Alertas de rendimiento y anomalías en vivo"):
+            st.markdown("#### Alertas de Rendimiento")
+            st.caption("Monitoreo automatizado del período")
+            st.divider()
+            st.markdown(f"🚀 **Sucursal con mayor tracción:** **{top_branch}** (${top_branch_sales:,.2f})")
+            st.markdown(f"⭐ **Línea líder:** **{top_prod}**")
+            if s_status == "negative":
+                st.warning(f"Ventas con tendencia a la baja vs período anterior ({sales_delta}).")
+            else:
+                st.success(f"Ritmo comercial positivo vs histórico ({sales_delta}).")
+    with c_bar_download:
+        csv_bytes = df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="",
+            data=csv_bytes,
+            file_name="supermarket_sales_executive.csv",
+            mime="text/csv",
+            icon=":material/download:",
+            help="Descargar reporte actual en CSV",
+            key="btn_download_exec",
+        )
+
+# Prepare Interactive Drilldown Payloads for KPIs
+branch_sales = df.groupby("Branch")["Sales"].sum()
+tot_s = kpis["total_sales"] or 1
+sales_drilldown = {
+    "title": "Desglose de Ventas",
+    "subtitle": "Volumen y porcentaje por sucursal",
+    "items": [
+        (f"Sucursal {b} ({'Yangon' if b=='A' else 'Naypyitaw' if b=='B' else 'Mandalay'})", f"${val:,.2f}", f"{(val/tot_s)*100:.1f}%")
+        for b, val in branch_sales.items()
+    ],
+    "stats": {
+        "Venta media/día": f"${daily_group['Sales'].sum().mean():,.0f}",
+        "Venta pico/día": f"${daily_group['Sales'].sum().max():,.0f}",
+    },
+    "tip": f"Sucursal {branch_sales.idxmax()} lidera el período con {branch_sales.max()/tot_s*100:.1f}% de cuota.",
+}
+
+pay_counts = df["Payment"].value_counts()
+tot_tx = len(df) or 1
+tx_drilldown = {
+    "title": "Desglose de Transacciones",
+    "subtitle": "Distribución por método de pago",
+    "items": [
+        (p_name, f"{cnt:,} órdenes", f"{(cnt/tot_tx)*100:.1f}%")
+        for p_name, cnt in pay_counts.items()
+    ],
+    "stats": {
+        "Órdenes / día": f"{daily_group['Sales'].count().mean():.1f}",
+        "Pico diario": f"{daily_group['Sales'].count().max():,}",
+    },
+    "tip": f"{pay_counts.idxmax()} es el método favorito ({pay_counts.max()/tot_tx*100:.1f}% del total).",
+}
+
+prod_profit = df.groupby("Product line")["gross income"].sum().sort_values(ascending=False).head(3)
+tot_p = kpis["total_profit"] or 1
+profit_drilldown = {
+    "title": "Desglose de Ganancia Bruta",
+    "subtitle": "Top categorías por aporte a la utilidad",
+    "items": [
+        (cat, f"${p:,.2f}", f"{(p/tot_p)*100:.1f}%")
+        for cat, p in prod_profit.items()
+    ],
+    "stats": {
+        "Margen promedio": f"{kpis['avg_margin']:.1f}%",
+        "Ganancia / día": f"${daily_group['gross income'].sum().mean():,.0f}",
+    },
+    "tip": f"Línea más rentable: {prod_profit.index[0]} aportando ${prod_profit.iloc[0]:,.2f}.",
+}
+
+cust_tickets = df.groupby("Customer type")["Sales"].mean()
+ticket_drilldown = {
+    "title": "Desglose de Ticket Promedio",
+    "subtitle": "Segmentos de clientes y tamaño de canasta",
+    "items": [
+        (f"Cliente {c_type}", f"${t_val:.2f}", "Ticket medio")
+        for c_type, t_val in cust_tickets.items()
+    ] + [
+        ("Unidades por ticket", f"{df['Quantity'].mean():.2f} unids", "Canasta media")
+    ],
+    "stats": {
+        "Ticket mín": f"${df['Sales'].min():.2f}",
+        "Ticket máx": f"${df['Sales'].max():.2f}",
+    },
+    "tip": "Clientes fidelizados ('Member') presentan compras con mayor predictibilidad.",
+}
+
+# 5. Primary Executive KPI Row with Interactive Drilldowns
+col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+
+with col_kpi1:
     render_kpi_card(
         "Ventas totales",
         f"${kpis['total_sales']:,.2f}",
@@ -114,7 +230,10 @@ with st.container(horizontal=True):
         subtitle=comp_label,
         chart_data=sales_spark,
         chart_type="area",
+        drilldown_data=sales_drilldown,
+        interactive_icon=":material/insights:",
     )
+with col_kpi2:
     render_kpi_card(
         "Transacciones",
         f"{kpis['transactions']:,}",
@@ -124,7 +243,10 @@ with st.container(horizontal=True):
         subtitle=comp_label,
         chart_data=tx_spark,
         chart_type="line",
+        drilldown_data=tx_drilldown,
+        interactive_icon=":material/pie_chart:",
     )
+with col_kpi3:
     render_kpi_card(
         "Ganancia bruta",
         f"${kpis['total_profit']:,.2f}",
@@ -134,7 +256,10 @@ with st.container(horizontal=True):
         subtitle=comp_label,
         chart_data=profit_spark,
         chart_type="area",
+        drilldown_data=profit_drilldown,
+        interactive_icon=":material/query_stats:",
     )
+with col_kpi4:
     render_kpi_card(
         "Ticket promedio",
         f"${kpis['avg_ticket']:.2f}",
@@ -144,27 +269,33 @@ with st.container(horizontal=True):
         subtitle=comp_label,
         chart_data=ticket_spark,
         chart_type="line",
+        drilldown_data=ticket_drilldown,
+        interactive_icon=":material/account_balance_wallet:",
     )
 
 # 6. Operational Targets & Efficiency Row
-with st.container(horizontal=True):
+col_op1, col_op2, col_op3, col_op4 = st.columns(4)
+with col_op1:
     render_kpi_card(
         "Margen bruto promedio",
         f"{kpis['avg_margin']:.1f}%",
         icon=":material/percent:",
         help_text="Margen sobre costo estipulado para la cadena",
     )
+with col_op2:
     render_kpi_card(
         "Índice de satisfacción",
         f"{kpis['avg_rating']:.2f} / 10",
         icon=":material/star:",
         help_text="Puntuación promedio de NPS y satisfacción directa",
     )
+with col_op3:
     render_kpi_card(
         "Unidades vendidas",
         f"{kpis['units_sold']:,}",
         icon=":material/inventory_2:",
     )
+with col_op4:
     render_kpi_card(
         "Sucursales operativas",
         f"{kpis['branches_count']}",
@@ -172,10 +303,6 @@ with st.container(horizontal=True):
     )
 
 # 7. Automated Dynamic Insight & Operational Pacing
-top_branch = df.groupby("Branch")["Sales"].sum().idxmax()
-top_branch_sales = df.groupby("Branch")["Sales"].sum().max()
-top_prod = df.groupby("Product line")["Sales"].sum().idxmax()
-
 render_insight_callout(
     title="Diagnóstico Ejecutivo Automatizado",
     message=(
@@ -184,6 +311,13 @@ render_insight_callout(
         f"Se han procesado **{kpis['transactions']:,}** órdenes con un ticket promedio de **${kpis['avg_ticket']:.2f}**."
     ),
     icon=":material/bolt:",
+    action_content=(
+        f"**Detalles Estratégicos:**\n\n"
+        f"- Margen promedio de la red: **{kpis['avg_margin']:.1f}%**\n"
+        f"- Nivel de satisfacción de clientes: **{kpis['avg_rating']:.2f} / 10**\n"
+        f"- Total de unidades en rotación: **{kpis['units_sold']:,} unidades**\n"
+        f"- Rebalanceo sugerido: Priorizar inventario de alta rotación en sucursal {top_branch}."
+    ),
 )
 
 # 8. Interactive Analytical Workspaces (Structured Modern Tabs)
